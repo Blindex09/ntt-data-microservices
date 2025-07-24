@@ -1,0 +1,96 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      
+      routes:
+        # Rota para Product Service
+        - id: product-service
+          uri: lb://product-service
+          predicates:
+            - Path=/products/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: product-service
+                fallbackuri: forward:/fallback/products
+        
+        # Rota para Order Service
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/orders/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: order-service
+                fallbackuri: forward:/fallback/orders
+        
+        # Rota para Eureka Server Dashboard
+        - id: eureka-server
+          uri: http://localhost:8761
+          predicates:
+            - Path=/eureka/web
+          filters:
+            - SetPath=/
+        
+        # Rota para console H2 do Product Service
+        - id: product-h2-console
+          uri: lb://product-service
+          predicates:
+            - Path=/product-h2/**
+          filters:
+            - StripPrefix=1
+            - SetPath=/h2-console
+        
+        # Rota para console H2 do Order Service
+        - id: order-h2-console
+          uri: lb://order-service
+          predicates:
+            - Path=/order-h2/**
+          filters:
+            - StripPrefix=1
+            - SetPath=/h2-console
+
+      # Configurações globais de CORS
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+
+# Configuração do Eureka Client
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+  instance:
+    prefer-ip-address: true
+
+# Configurações do Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
+
+# Logging
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.nttdata.gateway: DEBUG
